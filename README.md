@@ -6,6 +6,14 @@ Upload your documents and ask questions about their content. The system retrieve
 
 > 🔒 No paid LLM API key is required.
 
+## 📸 Demo
+
+![Document QA Assistant Demo](demo.png)
+
+The demo shows document ingestion, question answering, source attribution, and retrieved evidence in the Streamlit interface.
+
+---
+
 ---
 
 ## ✨ Features

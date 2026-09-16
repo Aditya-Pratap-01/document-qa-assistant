@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            font-family:
+                Inter,
+                Arial,
+                sans-serif;
+        }
+
+
+        /* -----------------------------------------
+           Composer
+           ----------------------------------------- */
+
+        .composer {
+
+            position: relative;
+
+            width: 100%;
+            height: 75px;
+
+            display: flex;
+            align-items: center;
+
+            gap: 14px;
+
+            padding: 0;
+        }
+
+
+        /* -----------------------------------------
+           Text Input
+           ----------------------------------------- */
+
+        .text-input {
+
+            flex: 1;
+
+            height: 64px;
+
+            border: 2px solid #159447;
+
+            border-radius: 35px;
+
+            outline: none;
+
+            padding: 0 24px;
+
+            font-size: 19px;
+
+            color: #1f2937;
+
+            background: #ffffff;
+
+            box-shadow:
+                0 1px 4px rgba(0, 0, 0, 0.04);
+
+            transition:
+                border-color 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+
+        .text-input:focus {
+
+            border-color: #11823f;
+
+            box-shadow:
+                0 0 0 3px rgba(21, 148, 71, 0.08);
+        }
+
+
+        .text-input::placeholder {
+
+            color: #9ca3af;
+
+            opacity: 1;
+        }
+
+
+        /* -----------------------------------------
+           Circular Buttons
+           ----------------------------------------- */
+
+        .icon-button {
+
+            width: 64px;
+            height: 64px;
+
+            flex-shrink: 0;
+
+            border-radius: 50%;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border: 1px solid #e5e7eb;
+
+            cursor: pointer;
+
+            font-size: 28px;
+
+            transition:
+                transform 0.15s ease,
+                box-shadow 0.15s ease,
+                background 0.15s ease;
+        }
+
+
+        .icon-button:hover {
+
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 4px 10px rgba(0, 0, 0, 0.10);
+        }
+
+
+        .icon-button:active {
+
+            transform: scale(0.96);
+        }
+
+
+        /* -----------------------------------------
+           Microphone
+           ----------------------------------------- */
+
+        .mic-button {
+
+            background: #ffffff;
+
+            color: #6b7280;
+        }
+
+
+        .mic-button.listening {
+
+            background: #fee2e2;
+
+            border-color: #ef4444;
+
+            color: #ef4444;
+        }
+
+
+        /* -----------------------------------------
+           Send Button
+           ----------------------------------------- */
+
+        .send-button {
+
+            background: #f2aa16;
+
+            border-color: #f2aa16;
+
+            color: #000000;
+
+            font-size: 31px;
+
+            font-weight: 700;
+
+            padding-bottom: 3px;
+        }
+
+
+        .send-button:hover {
+
+            background: #e9a313;
+        }
+
+
+        .send-button:disabled {
+
+            opacity: 0.55;
+
+            cursor: default;
+
+            transform: none;
+
+            box-shadow: none;
+        }
+
+
+        /* -----------------------------------------
+           Responsive
+           ----------------------------------------- */
+
+        @media (max-width: 700px) {
+
+            .composer {
+
+                gap: 8px;
+            }
+
+            .text-input {
+
+                height: 58px;
+
+                font-size: 16px;
+
+                padding: 0 18px;
+            }
+
+            .icon-button {
+
+                width: 58px;
+
+                height: 58px;
+
+                font-size: 24px;
+            }
+
+            .send-button {
+
+                font-size: 27px;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <div class="composer">
+
+        <input
+            id="textInput"
+            class="text-input"
+            type="text"
+            placeholder="Type your message..."
+            autocomplete="off"
+        >
+
+        <button
+            id="micButton"
+            class="icon-button mic-button"
+            title="Voice input"
+            type="button"
+        >
+            🎙️
+        </button>
+
+        <button
+            id="sendButton"
+            class="icon-button send-button"
+            title="Send message"
+            type="button"
+        >
+            ➤
+        </button>
+
+    </div>
+
+
+    <script>
+
+        // --------------------------------------------------
+        // Streamlit Component Ready
+        // --------------------------------------------------
+
+        window.parent.postMessage(
+            {
+                isStreamlitMessage: true,
+                type: "streamlit:componentReady",
+                apiVersion: 1
+            },
+            "*"
+        );
+
+
+        // --------------------------------------------------
+        // Elements
+        // --------------------------------------------------
+
+        const textInput =
+            document.getElementById("textInput");
+
+        const micButton =
+            document.getElementById("micButton");
+
+        const sendButton =
+            document.getElementById("sendButton");
+
+
+        // --------------------------------------------------
+        // Speech Recognition
+        // --------------------------------------------------
+
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+        let recognition = null;
+
+        let isListening = false;
+
+
+        if (SpeechRecognition) {
+
+            recognition =
+                new SpeechRecognition();
+
+            recognition.lang = "en-IN";
+
+            recognition.continuous = false;
+
+            recognition.interimResults = false;
+
+
+            // ----------------------------------------------
+            // Speech Result
+            // ----------------------------------------------
+
+            recognition.onresult = function(event) {
+
+                const transcript =
+                    event.results[0][0].transcript;
+
+                textInput.value =
+                    transcript;
+
+                textInput.placeholder =
+                    "Type your message...";
+
+                textInput.disabled =
+                    false;
+
+                micButton.classList.remove(
+                    "listening"
+                );
+
+                isListening = false;
+
+                textInput.focus();
+            };
+
+
+            // ----------------------------------------------
+            // Speech End
+            // ----------------------------------------------
+
+            recognition.onend = function() {
+
+                isListening = false;
+
+                textInput.disabled =
+                    false;
+
+                textInput.placeholder =
+                    "Type your message...";
+
+                micButton.classList.remove(
+                    "listening"
+                );
+            };
+
+
+            // ----------------------------------------------
+            // Speech Error
+            // ----------------------------------------------
+
+            recognition.onerror = function(event) {
+
+                console.log(
+                    "Speech recognition error:",
+                    event.error
+                );
+
+                isListening = false;
+
+                textInput.disabled =
+                    false;
+
+                textInput.placeholder =
+                    "Type your message...";
+
+                micButton.classList.remove(
+                    "listening"
+                );
+            };
+
+        } else {
+
+            micButton.disabled = true;
+
+            micButton.title =
+                "Speech recognition is not supported";
+        }
+
+
+        // --------------------------------------------------
+        // Microphone Button
+        // --------------------------------------------------
+
+        micButton.addEventListener(
+            "click",
+            function() {
+
+                if (!recognition) {
+                    return;
+                }
+
+
+                if (isListening) {
+
+                    recognition.stop();
+
+                    return;
+                }
+
+
+                // Clear previous text
+
+                textInput.value = "";
+
+
+                // Listening state
+
+                textInput.placeholder =
+                    "Listening...";
+
+                textInput.disabled =
+                    true;
+
+                micButton.classList.add(
+                    "listening"
+                );
+
+                isListening = true;
+
+
+                // Start recognition
+
+                try {
+
+                    recognition.start();
+
+                } catch (error) {
+
+                    console.log(
+                        "Recognition start error:",
+                        error
+                    );
+
+                    isListening = false;
+
+                    textInput.disabled =
+                        false;
+
+                    textInput.placeholder =
+                        "Type your message...";
+
+                    micButton.classList.remove(
+                        "listening"
+                    );
+                }
+
+            }
+        );
+
+
+        // --------------------------------------------------
+        // Send Function
+        // --------------------------------------------------
+
+        function sendMessage() {
+
+            const message =
+                textInput.value.trim();
+
+
+            if (!message) {
+
+                return;
+            }
+
+
+            // ----------------------------------------------
+            // Generate a UNIQUE ID for every message
+            // ----------------------------------------------
+
+            const messageId =
+                Date.now().toString() +
+                "-" +
+                Math.random()
+                    .toString(36)
+                    .substring(2, 10);
+
+
+            // ----------------------------------------------
+            // Send message + unique ID to Streamlit
+            // ----------------------------------------------
+
+            window.parent.postMessage(
+                {
+                    isStreamlitMessage: true,
+
+                    type:
+                        "streamlit:setComponentValue",
+
+                    value: {
+                        text: message,
+                        id: messageId
+                    }
+                },
+                "*"
+            );
+
+
+            // ----------------------------------------------
+            // Reset composer
+            // ----------------------------------------------
+
+            textInput.value = "";
+
+            textInput.placeholder =
+                "Type your message...";
+
+            textInput.disabled =
+                false;
+
+            textInput.focus();
+        }
+
+
+        // --------------------------------------------------
+        // Send Button
+        // --------------------------------------------------
+
+        sendButton.addEventListener(
+            "click",
+            function() {
+
+                sendMessage();
+
+            }
+        );
+
+
+        // --------------------------------------------------
+        // Enter Key
+        // --------------------------------------------------
+
+        textInput.addEventListener(
+            "keydown",
+            function(event) {
+
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    sendMessage();
+                }
+
+            }
+        );
+
+
+        // --------------------------------------------------
+        // Receive Streamlit Messages
+        // --------------------------------------------------
+
+        window.addEventListener(
+            "message",
+            function(event) {
+
+                const data =
+                    event.data;
+
+
+                if (!data) {
+
+                    return;
+                }
+
+
+                // ------------------------------------------
+                // Streamlit render
+                // ------------------------------------------
+                // Do NOT restore old text here.
+                // This prevents old messages from appearing
+                // again inside the input.
+                // ------------------------------------------
+
+                if (
+                    data.type ===
+                    "streamlit:render"
+                ) {
+
+                    // Intentionally empty.
+
+                }
+
+            }
+        );
+
+
+        // --------------------------------------------------
+        // Component Height
+        // --------------------------------------------------
+
+        window.parent.postMessage(
+            {
+                isStreamlitMessage: true,
+
+                type:
+                    "streamlit:setFrameHeight",
+
+                height: 75
+            },
+            "*"
+        );
+
+
+        // --------------------------------------------------
+        // Initial Focus
+        // --------------------------------------------------
+
+        setTimeout(
+            function() {
+
+                textInput.focus();
+
+            },
+            300
+        );
+
+    </script>
+
+</body>
+
+</html>

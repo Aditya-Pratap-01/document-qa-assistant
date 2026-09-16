@@ -1,4 +1,6 @@
 import streamlit as st
+import streamlit.components.v1 as components
+from pathlib import Path
 
 from config import DOCUMENTS_DIR
 from rag import (
@@ -7,6 +9,16 @@ from rag import (
     clear_collection,
 )
 from qa import answer_question
+
+
+# --------------------------------------------------
+# Speech to Text Component
+# --------------------------------------------------
+
+speech_to_text = components.declare_component(
+    "speech_to_text",
+    path=str(Path(__file__).parent / "stt_component"),
+)
 
 
 # --------------------------------------------------
@@ -29,11 +41,52 @@ st.markdown(
     """
     <style>
 
+    /* =============================================
+       REMOVE MAIN PAGE SCROLL
+       ============================================= */
+
+    html,
+    body {
+        overflow: hidden !important;
+    }
+
+    .stApp {
+        overflow: hidden !important;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        overflow: hidden !important;
+    }
+
+    section[data-testid="stMain"] {
+        overflow: hidden !important;
+        height: 100vh !important;
+    }
+
+    section[data-testid="stMain"] > div {
+        overflow: hidden !important;
+    }
+
+
+    /* =============================================
+       MAIN PAGE
+       ============================================= */
+
     .block-container {
         max-width: 1200px;
+
         padding-top: 2rem;
-        padding-bottom: 2rem;
+
+        /* Space reserved for fixed composer */
+        padding-bottom: 130px !important;
+
+        overflow: hidden !important;
     }
+
+
+    /* =============================================
+       HEADER
+       ============================================= */
 
     .app-title {
         font-size: 2.4rem;
@@ -46,6 +99,11 @@ st.markdown(
         color: #6b7280;
         margin-bottom: 1.8rem;
     }
+
+
+    /* =============================================
+       WELCOME CARD
+       ============================================= */
 
     .welcome-card {
         padding: 2rem;
@@ -72,6 +130,11 @@ st.markdown(
         margin-bottom: 1.5rem;
     }
 
+
+    /* =============================================
+       FEATURE CARDS
+       ============================================= */
+
     .feature-card {
         padding: 1rem;
         border-radius: 12px;
@@ -81,15 +144,10 @@ st.markdown(
         margin-bottom: 0.7rem;
     }
 
-    .answer-box {
-        padding: 1.2rem 1.3rem;
-        border-radius: 14px;
-        border: 1px solid #e5e7eb;
-        background: #f9fafb;
-        line-height: 1.7;
-        margin-top: 0.5rem;
-        margin-bottom: 1rem;
-    }
+
+    /* =============================================
+       SOURCES
+       ============================================= */
 
     .source-box {
         padding: 0.9rem 1rem;
@@ -113,9 +171,121 @@ st.markdown(
         font-size: 0.9rem;
     }
 
+
+    /* =============================================
+       SIDEBAR
+       ============================================= */
+
     section[data-testid="stSidebar"] {
         border-right: 1px solid #e5e7eb;
     }
+
+
+    /* =============================================
+       FIXED BOTTOM CHAT COMPOSER
+       ============================================= */
+
+    div[data-testid="stCustomComponentV1"] {
+
+        position: fixed !important;
+
+        left: 30% !important;
+        right: 3.5% !important;
+
+        bottom: 18px !important;
+
+        width: auto !important;
+        height: 75px !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        z-index: 999999 !important;
+
+        background: transparent !important;
+
+        border: none !important;
+
+        box-shadow: none !important;
+    }
+
+
+    /* =============================================
+       COMPONENT INNER WRAPPER
+       ============================================= */
+
+    div[data-testid="stCustomComponentV1"] > div {
+
+        width: 100% !important;
+        height: 75px !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        background: transparent !important;
+    }
+
+
+    /* =============================================
+       CHAT HISTORY
+       ONLY THIS AREA SCROLLS
+       ============================================= */
+
+    div[data-testid="stChatMessage"] {
+        margin-bottom: 12px;
+    }
+
+
+    /* =============================================
+       HIDE SCROLLBAR OF MAIN PAGE
+       ============================================= */
+
+    section[data-testid="stMain"]::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+    }
+
+    section[data-testid="stMain"] {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+
+    /* =============================================
+       RESPONSIVE
+       ============================================= */
+
+    @media (max-width: 900px) {
+
+        div[data-testid="stCustomComponentV1"] {
+
+            left: 5% !important;
+            right: 5% !important;
+
+            bottom: 12px !important;
+        }
+
+        .block-container {
+            padding-bottom: 115px !important;
+        }
+    }
+
+
+    @media (max-width: 600px) {
+
+        div[data-testid="stCustomComponentV1"] {
+
+            left: 3% !important;
+            right: 3% !important;
+
+            bottom: 8px !important;
+        }
+
+        .block-container {
+            padding-bottom: 105px !important;
+        }
+    }
+
 
     </style>
     """,
@@ -129,6 +299,111 @@ st.markdown(
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "welcome_shown" not in st.session_state:
+    st.session_state.welcome_shown = False
+
+if "input_version" not in st.session_state:
+    st.session_state.input_version = 0
+
+
+# --------------------------------------------------
+# Helper: Extract Question
+# --------------------------------------------------
+
+def get_question_text(value):
+
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        return value.strip()
+
+    if isinstance(value, dict):
+
+        possible_keys = [
+            "value",
+            "text",
+            "question",
+            "message",
+            "data",
+        ]
+
+        for key in possible_keys:
+
+            if key in value:
+
+                extracted = value[key]
+
+                if isinstance(extracted, str):
+                    return extracted.strip()
+
+        return None
+
+    return None
+
+
+# --------------------------------------------------
+# Welcome Popup
+# --------------------------------------------------
+
+@st.dialog("👋 Welcome!")
+def welcome_popup():
+
+    st.markdown(
+        """
+        <div style="
+            text-align:center;
+            padding:10px;
+        ">
+
+            <div style="
+                font-size:55px;
+                margin-bottom:10px;
+            ">
+                🤖
+            </div>
+
+            <h2 style="
+                margin-bottom:10px;
+            ">
+                Hi! 👋 I am your chatbot.
+            </h2>
+
+            <p style="
+                color:#6b7280;
+                font-size:16px;
+                line-height:1.6;
+            ">
+                Upload your documents and ask me
+                anything about them.
+            </p>
+
+            <p style="
+                color:#6b7280;
+                font-size:15px;
+            ">
+                You can type your question or use the 🎙️ microphone.
+            </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.button(
+        "🚀 Start Asking Questions",
+        use_container_width=True,
+        type="primary",
+    ):
+
+        st.session_state.welcome_shown = True
+
+        st.rerun()
+
+
+if not st.session_state.welcome_shown:
+    welcome_popup()
 
 
 # --------------------------------------------------
@@ -222,7 +497,13 @@ with st.sidebar:
 
             st.rerun()
 
+
     st.divider()
+
+
+    # --------------------------------------------------
+    # Statistics
+    # --------------------------------------------------
 
     st.subheader("📊 Statistics")
 
@@ -233,7 +514,13 @@ with st.sidebar:
         chunk_count,
     )
 
+
     st.divider()
+
+
+    # --------------------------------------------------
+    # Clear Knowledge Base
+    # --------------------------------------------------
 
     if st.button(
         "🗑️ Clear Knowledge Base",
@@ -244,13 +531,17 @@ with st.sidebar:
 
         st.session_state.messages = []
 
+        st.session_state.input_version = 0
+
         st.success(
             "Knowledge base cleared."
         )
 
         st.rerun()
 
+
     st.divider()
+
 
     st.caption(
         "🔒 Documents are processed locally."
@@ -290,9 +581,12 @@ if chunk_count == 0:
         unsafe_allow_html=True,
     )
 
+
     st.markdown("### ✨ What you can do")
 
+
     col1, col2, col3 = st.columns(3)
+
 
     with col1:
 
@@ -308,6 +602,7 @@ if chunk_count == 0:
             unsafe_allow_html=True,
         )
 
+
     with col2:
 
         st.markdown(
@@ -321,6 +616,7 @@ if chunk_count == 0:
             """,
             unsafe_allow_html=True,
         )
+
 
     with col3:
 
@@ -336,7 +632,9 @@ if chunk_count == 0:
             unsafe_allow_html=True,
         )
 
+
     st.markdown("### 💡 Example questions")
+
 
     st.markdown(
         """
@@ -350,250 +648,319 @@ if chunk_count == 0:
 
 else:
 
-    # --------------------------------------------------
-    # Chat History
-    # --------------------------------------------------
+    # ==================================================
+    # SCROLLABLE CHAT HISTORY
+    # ==================================================
+    #
+    # ONLY THIS CONTAINER SCROLLS.
+    # THE MAIN PAGE ITSELF DOES NOT SCROLL.
+    #
+    # ==================================================
 
-    for message in st.session_state.messages:
+    with st.container(
+        height=560,
+        border=False,
+    ):
 
-        role = message["role"]
+        for message in st.session_state.messages:
 
-        if role == "user":
+            role = message["role"]
 
-            with st.chat_message("user"):
 
-                st.markdown(
-                    message["content"]
-                )
+            # ------------------------------------------
+            # User Message
+            # ------------------------------------------
 
-        else:
+            if role == "user":
 
-            with st.chat_message(
-                "assistant",
-                avatar="🤖",
-            ):
+                with st.chat_message("user"):
 
-                st.markdown(
-                    message["content"]
-                )
+                    st.markdown(
+                        message["content"]
+                    )
 
-                sources = message.get(
-                    "sources",
-                    [],
-                )
 
-                if sources:
+            # ------------------------------------------
+            # Assistant Message
+            # ------------------------------------------
 
-                    with st.expander(
-                        f"📚 Sources & Evidence ({len(sources)})"
-                    ):
+            else:
 
-                        for index, source in enumerate(
-                            sources,
-                            start=1,
+                with st.chat_message(
+                    "assistant",
+                    avatar="🤖",
+                ):
+
+                    st.markdown(
+                        message["content"]
+                    )
+
+
+                    sources = message.get(
+                        "sources",
+                        [],
+                    )
+
+
+                    # ----------------------------------
+                    # Sources & Evidence
+                    # ----------------------------------
+
+                    if sources:
+
+                        with st.expander(
+                            f"📚 Sources & Evidence ({len(sources)})"
                         ):
 
-                            source_name = source[
-                                "source"
-                            ]
-
-                            page = source[
-                                "page"
-                            ]
-
-                            chunk_id = source[
-                                "chunk_id"
-                            ]
-
-                            evidence = source[
-                                "text"
-                            ]
-
-                            if (
-                                page is not None
-                                and page != -1
+                            for index, source in enumerate(
+                                sources,
+                                start=1,
                             ):
 
-                                location = (
-                                    f"Page {page}"
-                                )
+                                source_name = source[
+                                    "source"
+                                ]
 
-                            else:
+                                page = source[
+                                    "page"
+                                ]
 
-                                location = (
-                                    "Document"
-                                )
+                                chunk_id = source[
+                                    "chunk_id"
+                                ]
 
-                            st.markdown(
-                                f"""
-                                <div class="source-box">
-                                <strong>
-                                📄 Source {index}: {source_name}
-                                </strong>
-                                <br>
-                                <span class="muted">
-                                {location} · Chunk {chunk_id}
-                                </span>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
+                                evidence = source[
+                                    "text"
+                                ]
 
-                            with st.expander(
-                                "🔍 View retrieved evidence"
-                            ):
+
+                                if (
+                                    page is not None
+                                    and page != -1
+                                ):
+
+                                    location = (
+                                        f"Page {page}"
+                                    )
+
+                                else:
+
+                                    location = (
+                                        "Document"
+                                    )
+
 
                                 st.markdown(
                                     f"""
-                                    <div class="evidence-box">
-                                    {evidence}
+                                    <div class="source-box">
+
+                                    <strong>
+                                    📄 Source {index}: {source_name}
+                                    </strong>
+
+                                    <br>
+
+                                    <span class="muted">
+                                    {location} · Chunk {chunk_id}
+                                    </span>
+
                                     </div>
                                     """,
                                     unsafe_allow_html=True,
                                 )
 
 
-    # --------------------------------------------------
-    # Chat Input
-    # --------------------------------------------------
+                                with st.expander(
+                                    "🔍 View retrieved evidence"
+                                ):
 
-    question = st.chat_input(
-        "Ask a question about your documents..."
+                                    st.markdown(
+                                        f"""
+                                        <div class="evidence-box">
+                                        {evidence}
+                                        </div>
+                                        """,
+                                        unsafe_allow_html=True,
+                                    )
+
+
+    # ==================================================
+    # FIXED BOTTOM CHAT COMPOSER
+    # ==================================================
+
+    component_key = (
+        f"speech_to_text_{st.session_state.input_version}"
     )
 
 
+    raw_question = speech_to_text(
+        default=None,
+        key=component_key,
+        height=75,
+    )
+
+
+    # --------------------------------------------------
+    # Extract Question
+    # --------------------------------------------------
+
+    question = get_question_text(
+        raw_question
+    )
+
+
+    # --------------------------------------------------
+    # Process Question
+    # --------------------------------------------------
+
     if question:
 
-        # ----------------------------------------------
-        # User message
-        # ----------------------------------------------
-
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": question,
-            }
-        )
-
-        with st.chat_message("user"):
-
-            st.markdown(question)
+        question = question.strip()
 
 
-        # ----------------------------------------------
-        # Generate answer
-        # ----------------------------------------------
+        if question:
 
-        with st.chat_message(
-            "assistant",
-            avatar="🤖",
-        ):
-
-            with st.spinner(
-                "Searching documents and generating answer..."
-            ):
-
-                result = answer_question(
-                    question,
-                    candidate_k=10,
-                    final_k=3,
-                )
-
-            answer = result[
-                "answer"
-            ]
-
-            sources = result.get(
-                "sources",
-                [],
+            normalized_question = (
+                question.lower().strip()
             )
 
-            st.markdown(answer)
-
 
             # ------------------------------------------
-            # Sources + Evidence
-            # ------------------------------------------
-
-            if sources:
-
-                with st.expander(
-                    f"📚 Sources & Evidence ({len(sources)})"
-                ):
-
-                    for index, source in enumerate(
-                        sources,
-                        start=1,
-                    ):
-
-                        source_name = source[
-                            "source"
-                        ]
-
-                        page = source[
-                            "page"
-                        ]
-
-                        chunk_id = source[
-                            "chunk_id"
-                        ]
-
-                        evidence = source[
-                            "text"
-                        ]
-
-                        if (
-                            page is not None
-                            and page != -1
-                        ):
-
-                            location = (
-                                f"Page {page}"
-                            )
-
-                        else:
-
-                            location = (
-                                "Document"
-                            )
-
-                        st.markdown(
-                            f"""
-                            <div class="source-box">
-                            <strong>
-                            📄 Source {index}: {source_name}
-                            </strong>
-                            <br>
-                            <span class="muted">
-                            {location} · Chunk {chunk_id}
-                            </span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-
-                        with st.expander(
-                            "🔍 View retrieved evidence"
-                        ):
-
-                            st.markdown(
-                                f"""
-                                <div class="evidence-box">
-                                {evidence}
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-
-
-            # ------------------------------------------
-            # Save assistant response
+            # Save User Message
             # ------------------------------------------
 
             st.session_state.messages.append(
                 {
-                    "role": "assistant",
-                    "content": answer,
-                    "sources": sources,
+                    "role": "user",
+                    "content": question,
                 }
             )
+
+
+            # ------------------------------------------
+            # Greeting Words
+            # ------------------------------------------
+
+            greeting_words = {
+                "hi",
+                "hii",
+                "hiii",
+                "hello",
+                "hey",
+                "hey there",
+                "good morning",
+                "good afternoon",
+                "good evening",
+            }
+
+
+            # ------------------------------------------
+            # Goodbye / Thanks Words
+            # ------------------------------------------
+
+            goodbye_words = {
+                "bye",
+                "goodbye",
+                "thanks",
+                "thank you",
+                "thx",
+                "thankyou",
+            }
+
+
+            # ------------------------------------------
+            # Greeting Response
+            # ------------------------------------------
+
+            if normalized_question in greeting_words:
+
+                answer = (
+                    "Hello! 👋 How can I help you "
+                    "with your documents?"
+                )
+
+
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": [],
+                    }
+                )
+
+
+                st.session_state.input_version += 1
+
+                st.rerun()
+
+
+            # ------------------------------------------
+            # Goodbye / Thanks Response
+            # ------------------------------------------
+
+            elif normalized_question in goodbye_words:
+
+                answer = (
+                    "You're welcome! 😊 Have a great day!"
+                )
+
+
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": [],
+                    }
+                )
+
+
+                st.session_state.input_version += 1
+
+                st.rerun()
+
+
+            # ------------------------------------------
+            # RAG Question
+            # ------------------------------------------
+
+            else:
+
+                with st.spinner(
+                    "Searching documents and generating answer..."
+                ):
+
+                    result = answer_question(
+                        question,
+                        candidate_k=10,
+                        final_k=3,
+                    )
+
+
+                answer = result["answer"]
+
+                sources = result.get(
+                    "sources",
+                    [],
+                )
+
+
+                # --------------------------------------
+                # Save Assistant Response
+                # --------------------------------------
+
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": sources,
+                    }
+                )
+
+
+                # --------------------------------------
+                # Fresh Input Component
+                # --------------------------------------
+
+                st.session_state.input_version += 1
+
+                st.rerun()
